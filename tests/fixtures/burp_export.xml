@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<!DOCTYPE items [
+<!ELEMENT items (item*)>
+]>
+<items burpVersion="2023.10.3" exportTime="Mon Nov 06 15:35:00 CST 2023">
+  <item>
+    <time>Mon Nov 06 15:30:12 CST 2023</time>
+    <url><![CDATA[https://api.example.com/v1/search?q=burp&page=2]]></url>
+    <host ip="93.184.216.34">api.example.com</host>
+    <port>443</port>
+    <protocol>https</protocol>
+    <method><![CDATA[GET]]></method>
+    <path><![CDATA[/v1/search?q=burp&amp;page=2]]></path>
+    <extension>null</extension>
+    <request base64="true">R0VUIC92MS9zZWFyY2g/cT1idXJwJnBhZ2U9MiBIVFRQLzEuMQ0KSG9zdDogYXBpLmV4YW1wbGUuY29tDQpDb29raWU6IHNpZD1hYmMxMjM7IHByZWZzPXsidGhlbWUiOiJkYXJrIn07IGxhbmc9ZW4NCkFjY2VwdC1FbmNvZGluZzogZ3ppcA0KDQo=</request>
+    <status>200</status>
+    <responselength>256</responselength>
+    <mimetype>JSON</mimetype>
+    <response base64="true">SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24NClRyYW5zZmVyLUVuY29kaW5nOiBjaHVua2VkDQpDb250ZW50LUVuY29kaW5nOiBnemlwDQpTZXQtQ29va2llOiBzaWQ9YWJjMTIzOyBQYXRoPS87IEV4cGlyZXM9V2VkLCAyMSBPY3QgMjAyNiAwNzoyODowMCBHTVQ7IEh0dHBPbmx5OyBTZWN1cmU7IFNhbWVTaXRlPUxheA0KDQoyNw0KH4sIAAAAAAACA6tWKkotLs0pKVayijbUMdIxjq0FAGk9E74TAAAADQowDQoNCg==</response>
+    <comment>interesting search</comment>
+  </item>
+  <item>
+    <time>Mon Nov 06 15:30:14 CST 2023</time>
+    <url><![CDATA[http://legacy.example.com:8080/login]]></url>
+    <host ip="10.0.0.5">legacy.example.com</host>
+    <port>8080</port>
+    <protocol>http</protocol>
+    <method><![CDATA[POST]]></method>
+    <path><![CDATA[/login]]></path>
+    <extension>null</extension>
+    <request base64="false"><![CDATA[POST /login HTTP/1.1
+Host: legacy.example.com:8080
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 27
+
+user=alice&pass=s3cr3t%21&x=]]></request>
+    <status>302</status>
+    <responselength>58</responselength>
+    <mimetype>JSON</mimetype>
+    <response base64="false"><![CDATA[HTTP/1.1 302 Found
+Location: /home
+Content-Length: 0
+
+]]></response>
+    <comment></comment>
+  </item>
+  <item>
+    <time>Mon Nov 06 15:30:20 CST 2023</time>
+    <url><![CDATA[https://api.example.com/v1/slow]]></url>
+    <host ip="93.184.216.34">api.example.com</host>
+    <port>443</port>
+    <protocol>https</protocol>
+    <method><![CDATA[GET]]></method>
+    <path><![CDATA[/v1/slow]]></path>
+    <extension>null</extension>
+    <request base64="true">R0VUIC92MS9zbG93IEhUVFAvMS4xDQpIb3N0OiBhcGkuZXhhbXBsZS5jb20NCg0K</request>
+    <status></status>
+    <responselength>0</responselength>
+    <mimetype>JSON</mimetype>
+    <response base64="true"></response>
+    <comment></comment>
+  </item>
+  <item>
+    <time>Mon Nov 06 15:29:58 CST 2023</time>
+    <url><![CDATA[https://cdn.example.net/logo.png]]></url>
+    <host ip="198.51.100.7">cdn.example.net</host>
+    <port>443</port>
+    <protocol>https</protocol>
+    <method><![CDATA[GET]]></method>
+    <path><![CDATA[/logo.png]]></path>
+    <extension>null</extension>
+    <request base64="true">R0VUIC9sb2dvLnBuZyBIVFRQLzINCkhvc3Q6IGNkbi5leGFtcGxlLm5ldA0KDQo=</request>
+    <status>200</status>
+    <responselength>58</responselength>
+    <mimetype>JSON</mimetype>
+    <response base64="true">SFRUUC8yIDIwMCBPSw0KQ29udGVudC1UeXBlOiBpbWFnZS9wbmcNCg0KiVBORw0KGgoAAAANSUhEUg==</response>
+    <comment></comment>
+  </item>
+</items>
