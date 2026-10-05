@@ -1,24 +1,42 @@
 # burp2har
 
+[![CI](https://github.com/lwierzbicki/burp2har/actions/workflows/ci.yml/badge.svg)](https://github.com/lwierzbicki/burp2har/actions/workflows/ci.yml)
+
 Convert a Burp Suite XML export into a HAR (HTTP Archive 1.2) file.
 
-Single file, no external dependencies (Python standard library only). Point it
-at a `Save items → XML` export from Burp Suite and it produces a standard HAR
-that browser DevTools, Caido, `jq`, and HAR-consuming tooling can read.
+Point it at a `Save items → XML` export from Burp Suite and it produces a
+standard HAR that browser DevTools, Caido, `jq`, and HAR-consuming tooling can
+read.
 
 ## Why
 
 Burp Suite exports proxy history as its own XML format, but most downstream
 tooling speaks HAR. `burp2har` bridges the two offline — no running Burp, no
-Burp Suite Professional, no third-party packages — so an XML export can be
-turned into a portable HAR anywhere Python runs.
+Burp Suite Professional — so an XML export can be turned into a portable HAR
+anywhere Python runs.
+
+## Installation
+
+As a package (puts a `burp2har` command on your PATH):
+
+```bash
+pip install .
+```
+
+For development (editable install with test/lint/type tooling):
+
+```bash
+pip install -e ".[dev]"   # or: make setup
+```
 
 ## Usage
 
 ```bash
-python3 burp2har.py -i input.xml -o output.har
-python3 burp2har.py -i input.xml -o output.har -v   # verbose warnings to stderr
+burp2har -i input.xml -o output.har
+burp2har -i input.xml -o output.har -v   # verbose warnings to stderr
 ```
+
+`-o` defaults to `output.har` when omitted.
 
 ### Export from Burp Suite
 
@@ -43,15 +61,31 @@ disk.
 
 ## Requirements
 
-Python 3.10+
+- Python 3.11+
+- `click>=8.1` (the only runtime dependency)
+
+## Development
+
+Source lives under `src/burp2har/` — `core.py` (pure conversion logic) and
+`cli.py` (the `click` entry point). Common tasks run through the `Makefile`:
+
+```bash
+make setup      # venv + editable install with dev extras
+make format     # ruff format + ruff check --fix
+make lint       # ruff check
+make typecheck  # mypy --strict
+make test       # pytest with coverage
+make build      # sdist + wheel
+```
 
 ## Tests
 
 ```bash
-python -m unittest discover tests/ -v
+make test       # or: pytest
 ```
 
-20 tests, standard library only.
+Unit tests cover the pure parsers; integration tests exercise conversion and the
+CLI end to end. Coverage ≥ 80% on core logic.
 
 ## Known Limitations
 

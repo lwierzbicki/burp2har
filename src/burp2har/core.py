@@ -1,40 +1,42 @@
-#!/usr/bin/env python3
-"""
-Convert Burp Suite "Save items -> XML" export into a HAR 1.2 file.
+"""Convert a Burp Suite "Save items -> XML" export into a HAR 1.2 file.
 
-Usage:
-  python burp2har.py -i input.xml -o output.har
+Pure conversion logic. The ``click`` entry point lives in ``cli.py``.
 
 Burp export path:
   Proxy -> HTTP history -> select items -> right click -> Save items -> XML
 """
 
-import argparse
+from __future__ import annotations
+
 import base64
+import contextlib
 import json
-import sys
 import xml.etree.ElementTree as ET
 import zlib
-from datetime import datetime, timezone
-from urllib.parse import urlparse, parse_qsl
+from datetime import UTC, datetime
 from http.cookies import SimpleCookie
+from typing import Any
+from urllib.parse import parse_qsl, urlparse
+
+import click
+
+__version__ = "0.1.0"
+
+Header = tuple[str, str]
 
 
-_verbose: bool = False
+def _warn(msg: str, *, verbose: bool) -> None:
+    if verbose:
+        click.echo(f"[!] {msg}", err=True)
 
 
-def _warn(msg: str) -> None:
-    if _verbose:
-        print(f"[!] {msg}", file=sys.stderr)
-
-
-def _text(elem, default=""):
+def _text(elem: ET.Element | None, default: str = "") -> str:
     if elem is None or elem.text is None:
         return default
     return elem.text
 
 
-def _is_base64(elem) -> bool:
+def _is_base64(elem: ET.Element | None) -> bool:
     if elem is None:
         return False
     # Burp uses attribute base64="true"
@@ -54,10 +56,8 @@ def _safe_decode_utf8(data: bytes) -> tuple[str, str | None]:
         return base64.b64encode(data).decode("ascii"), "base64"
 
 
-def _split_http_message(raw: bytes) -> tuple[str, list[tuple[str, str]], bytes]:
-    """
-    Split raw HTTP message into (start_line, headers_list, body_bytes).
-    """
+def _split_http_message(raw: bytes) -> tuple[str, list[Header], bytes]:
+    """Split raw HTTP message into (start_line, headers_list, body_bytes)."""
     # Burp typically uses \r\n but tolerate \n-only
     if b"\r\n\r\n" in raw:
         head, body = raw.split(b"\r\n\r\n", 1)
@@ -74,7 +74,7 @@ def _split_http_message(raw: bytes) -> tuple[str, list[tuple[str, str]], bytes]:
         return "", [], body
 
     start_line = lines[0].decode("iso-8859-1", errors="replace").strip()
-    headers = []
+    headers: list[Header] = []
     for ln in lines[1:]:
         s = ln.decode("iso-8859-1", errors="replace").rstrip("\r\n")
         if not s.strip():
@@ -93,9 +93,16 @@ def _compute_headers_size(raw: bytes) -> int:
     return len(raw)
 
 
-def _parse_set_cookie(header_value: str) -> dict:
+def _parse_set_cookie(header_value: str) -> dict[str, Any]:
     parts = [p.strip() for p in header_value.split(";")]
-    cookie = {"name": "", "value": "", "path": "", "domain": "", "httpOnly": False, "secure": False}
+    cookie: dict[str, Any] = {
+        "name": "",
+        "value": "",
+        "path": "",
+        "domain": "",
+        "httpOnly": False,
+        "secure": False,
+    }
     if parts:
         nv = parts[0].split("=", 1)
         cookie["name"] = nv[0].strip()
@@ -113,10 +120,10 @@ def _parse_set_cookie(header_value: str) -> dict:
     return cookie
 
 
-def _parse_request(raw_req: bytes, fallback_url: str = "") -> dict:
-    """
-    Parse raw HTTP request bytes into HAR request fields.
-    """
+def _parse_request(
+    raw_req: bytes, fallback_url: str = "", *, verbose: bool = False
+) -> dict[str, Any]:
+    """Parse raw HTTP request bytes into HAR request fields."""
     start_line, headers, body = _split_http_message(raw_req)
 
     method = "GET"
@@ -132,7 +139,7 @@ def _parse_request(raw_req: bytes, fallback_url: str = "") -> dict:
         http_version = parts[2]
 
     # Build URL from Host header if possible, otherwise fallback to Burp <url>
-    host = None
+    host: str | None = None
     for k, v in headers:
         if k.lower() == "host":
             host = v
@@ -146,10 +153,8 @@ def _parse_request(raw_req: bytes, fallback_url: str = "") -> dict:
             # Default to https if fallback_url suggests it, else http
             scheme = "http"
             if fallback_url:
-                try:
+                with contextlib.suppress(Exception):
                     scheme = urlparse(fallback_url).scheme or scheme
-                except Exception:
-                    pass
             url = f"{scheme}://{host}{path}"
     else:
         url = fallback_url or path
@@ -159,7 +164,7 @@ def _parse_request(raw_req: bytes, fallback_url: str = "") -> dict:
     query = [{"name": k, "value": v} for k, v in parse_qsl(parsed.query, keep_blank_values=True)]
 
     # Cookies from "Cookie" header
-    cookies = []
+    cookies: list[dict[str, Any]] = []
     for k, v in headers:
         if k.lower() == "cookie":
             c = SimpleCookie()
@@ -168,10 +173,10 @@ def _parse_request(raw_req: bytes, fallback_url: str = "") -> dict:
                 for name, morsel in c.items():
                     cookies.append({"name": name, "value": morsel.value})
             except Exception as e:
-                _warn(f"Cookie parse failed for value {v!r}: {e}")
+                _warn(f"Cookie parse failed for value {v!r}: {e}", verbose=verbose)
 
     # Post data
-    post_data = None
+    post_data: dict[str, Any] | None = None
     if body:
         mime = ""
         for k, v in headers:
@@ -187,8 +192,7 @@ def _parse_request(raw_req: bytes, fallback_url: str = "") -> dict:
             post_data["encoding"] = "base64"
         if enc is None and "application/x-www-form-urlencoded" in mime:
             post_data["params"] = [
-                {"name": k, "value": v}
-                for k, v in parse_qsl(text, keep_blank_values=True)
+                {"name": k, "value": v} for k, v in parse_qsl(text, keep_blank_values=True)
             ]
 
     har_headers = [{"name": k, "value": v} for k, v in headers]
@@ -206,10 +210,8 @@ def _parse_request(raw_req: bytes, fallback_url: str = "") -> dict:
     }
 
 
-def _parse_response(raw_resp: bytes) -> dict:
-    """
-    Parse raw HTTP response bytes into HAR response fields.
-    """
+def _parse_response(raw_resp: bytes) -> dict[str, Any]:
+    """Parse raw HTTP response bytes into HAR response fields."""
     if not raw_resp:
         # Some Burp items may not have a response
         return {
@@ -242,7 +244,7 @@ def _parse_response(raw_resp: bytes) -> dict:
         status_text = parts[2]
 
     # Cookies from Set-Cookie
-    cookies = []
+    cookies: list[dict[str, Any]] = []
     for k, v in headers:
         if k.lower() == "set-cookie":
             cookies.append(_parse_set_cookie(v))
@@ -254,7 +256,7 @@ def _parse_response(raw_resp: bytes) -> dict:
             break
 
     text, enc = _safe_decode_utf8(body)
-    content = {
+    content: dict[str, Any] = {
         "size": len(body) if body else 0,
         "mimeType": mime or "",
         "text": text,
@@ -269,7 +271,7 @@ def _parse_response(raw_resp: bytes) -> dict:
             content_encoding = v.strip().lower()
             break
     if body and content_encoding in ("gzip", "x-gzip", "deflate"):
-        try:
+        with contextlib.suppress(zlib.error):
             wbits = 47 if content_encoding in ("gzip", "x-gzip") else 15
             decompressed = zlib.decompress(body, wbits)
             content["size"] = len(decompressed)
@@ -280,8 +282,6 @@ def _parse_response(raw_resp: bytes) -> dict:
                 content["encoding"] = "base64"
             elif "encoding" in content:
                 del content["encoding"]
-        except zlib.error:
-            pass
 
     har_headers = [{"name": k, "value": v} for k, v in headers]
 
@@ -307,28 +307,29 @@ def _parse_response(raw_resp: bytes) -> dict:
 
 
 def _parse_burp_time(elem_time_text: str) -> datetime:
-    """
-    Burp <time> is commonly epoch milliseconds.
-    If missing/invalid, return now().
+    """Parse Burp ``<time>`` (commonly epoch milliseconds).
+
+    If missing/invalid, return ``now()``.
     """
     if not elem_time_text:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     try:
         t = int(elem_time_text.strip())
         # Heuristic: epoch ms are large (>= 10^12)
         if t > 10**11:
-            return datetime.fromtimestamp(t / 1000.0, tz=timezone.utc)
-        return datetime.fromtimestamp(t, tz=timezone.utc)
+            return datetime.fromtimestamp(t / 1000.0, tz=UTC)
+        return datetime.fromtimestamp(t, tz=UTC)
     except Exception:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
 
-def burp_xml_to_har(xml_path: str) -> dict:
+def burp_xml_to_har(xml_path: str, *, verbose: bool = False) -> dict[str, Any]:
+    """Parse a Burp XML export at ``xml_path`` into a HAR 1.2 dictionary."""
     tree = ET.parse(xml_path)
     root = tree.getroot()
 
-    entries = []
-    pages_map = {}  # hostname -> page dict
+    entries: list[dict[str, Any]] = []
+    pages_map: dict[str, dict[str, Any]] = {}  # hostname -> page dict
     page_counter = 0
 
     # Burp exports usually have <items><item>...</item></items>
@@ -357,7 +358,7 @@ def burp_xml_to_har(xml_path: str) -> dict:
             else:
                 raw_resp = resp_elem.text.encode("utf-8", errors="replace")
 
-        har_request = _parse_request(raw_req, fallback_url=url)
+        har_request = _parse_request(raw_req, fallback_url=url, verbose=verbose)
         har_response = _parse_response(raw_resp)
 
         # Group by hostname for pages
@@ -373,7 +374,15 @@ def burp_xml_to_har(xml_path: str) -> dict:
         pageref = pages_map[hostname]["id"]
 
         # Burp doesn't provide accurate timing breakdown in this export, so set minimal defaults
-        timings = {"blocked": -1, "dns": -1, "connect": -1, "send": 0, "wait": 0, "receive": 0, "ssl": -1}
+        timings = {
+            "blocked": -1,
+            "dns": -1,
+            "connect": -1,
+            "send": 0,
+            "wait": 0,
+            "receive": 0,
+            "ssl": -1,
+        }
 
         entry = {
             "startedDateTime": started_dt,
@@ -386,41 +395,18 @@ def burp_xml_to_har(xml_path: str) -> dict:
         }
         entries.append(entry)
 
-    har = {
+    return {
         "log": {
             "version": "1.2",
-            "creator": {"name": "burp_xml_to_har.py", "version": "1.0"},
+            "creator": {"name": "burp2har", "version": __version__},
             "pages": list(pages_map.values()),
             "entries": entries,
         }
     }
-    return har
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Convert Burp XML (Save items) to HAR.")
-    ap.add_argument("-i", "--input", required=True, dest="input_xml", help="Burp XML file exported via 'Save items -> XML'")
-    ap.add_argument("-o", "--output", default="output.har", help="Output HAR path (default: output.har)")
-    ap.add_argument("-v", "--verbose", action="store_true", help="Print warnings to stderr")
-    args = ap.parse_args()
-
-    global _verbose
-    _verbose = args.verbose
-
-    try:
-        har = burp_xml_to_har(args.input_xml)
-    except FileNotFoundError:
-        print(f"[-] File not found: {args.input_xml}", file=sys.stderr)
-        sys.exit(1)
-    except ET.ParseError as e:
-        print(f"[-] Invalid XML: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    with open(args.output, "w", encoding="utf-8") as f:
+def convert(xml_path: str, output_path: str, *, verbose: bool = False) -> None:
+    """Parse the Burp XML at ``xml_path`` and write a HAR file to ``output_path``."""
+    har = burp_xml_to_har(xml_path, verbose=verbose)
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(har, f, indent=2, ensure_ascii=False)
-
-    print(f"[+] Wrote HAR: {args.output}")
-
-
-if __name__ == "__main__":
-    main()

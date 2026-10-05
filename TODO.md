@@ -1,4 +1,7 @@
-# TODO — burp2har.py
+# TODO — burp2har
+
+`src/burp2har/` package (`core.py` + `cli.py`) on the shared pentest-tools
+baseline, Python 3.11+.
 
 ## Missing Features
 

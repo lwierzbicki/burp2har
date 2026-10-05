@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "permission": {
+    "*": "allow",
+    "external_directory": {
+      "/tmp/**": "allow"
+    }
+  },
+  "shell": "bash"
+}

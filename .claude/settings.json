@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "/tmp"
+    ],
+    "allow": [
+      "Bash(*)"
+    ]
+  }
+}
